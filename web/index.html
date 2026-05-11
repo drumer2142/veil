@@ -4,6 +4,17 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Overseer</title>
+    <script>
+      (function () {
+        var KEY = "overseer-theme";
+        var v = null;
+        try {
+          v = localStorage.getItem(KEY);
+        } catch (e) {}
+        var t = v === "light-orange" ? "light-orange" : "dark";
+        document.documentElement.setAttribute("data-theme", t);
+      })();
+    </script>
     <link rel="icon" href="/static/logo.png" type="image/png" sizes="any" />
     <link rel="stylesheet" href="/static/styles.css" />
   </head>
@@ -26,6 +37,13 @@
           <button type="button" class="btn" id="btn-categories">Categories</button>
           <button type="button" class="btn" id="btn-export">Export</button>
           <button type="button" class="btn" id="btn-import-toggle">Import</button>
+          <label class="theme-select-wrap">
+            <span class="visually-hidden">Theme</span>
+            <select id="theme-select" class="theme-select" title="Theme" aria-label="Theme">
+              <option value="dark">Dark</option>
+              <option value="light-orange">Light orange</option>
+            </select>
+          </label>
         </div>
       </div>
     </header>

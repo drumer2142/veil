@@ -31,7 +31,36 @@
     categoryOrderList: $("#category-order-list"),
     btnCategoryOrderCancel: $("#btn-category-order-cancel"),
     btnCategoryOrderSave: $("#btn-category-order-save"),
+    themeSelect: $("#theme-select"),
+    logoImg: document.querySelector(".brand img"),
   };
+
+  const THEME_KEY = "overseer-theme";
+  const THEME_IDS = new Set(["dark", "light-orange"]);
+
+  function getTheme() {
+    try {
+      const v = localStorage.getItem(THEME_KEY);
+      if (THEME_IDS.has(v)) return v;
+    } catch (e) {
+      /* ignore */
+    }
+    return "dark";
+  }
+
+  function applyTheme(id) {
+    const t = THEME_IDS.has(id) ? id : "dark";
+    document.documentElement.setAttribute("data-theme", t);
+    try {
+      localStorage.setItem(THEME_KEY, t);
+    } catch (e) {
+      /* ignore */
+    }
+    if (els.themeSelect) els.themeSelect.value = t;
+    if (els.logoImg) {
+      els.logoImg.src = t === "light-orange" ? "/static/logo-light-orange.svg" : "/static/logo.svg";
+    }
+  }
 
   /** @type {{ id:number; name:string; url:string; category:string; hasIcon:boolean; sortOrder:number; createdAt:string }[]} */
   let bookmarks = [];
@@ -522,6 +551,13 @@
   els.btnCategories.addEventListener("click", openCategoryOrderModal);
   els.btnCategoryOrderCancel.addEventListener("click", () => els.categoryOrderModal.close());
   els.btnCategoryOrderSave.addEventListener("click", () => saveCategoryOrder().catch(() => toast("Save failed", true)));
+
+  const initialTheme = getTheme();
+  applyTheme(initialTheme);
+  if (els.themeSelect) {
+    els.themeSelect.value = initialTheme;
+    els.themeSelect.addEventListener("change", () => applyTheme(els.themeSelect.value));
+  }
 
   load().catch(() => toast("Failed to load", true));
 })();

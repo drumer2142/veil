@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "exportedAt": "2026-05-11T12:00:00Z",
+  "bookmarks": [
+    {
+      "name": "Imported service A",
+      "url": "http://service-a.example.local:9000",
+      "category": "Imports",
+      "sortOrder": 0
+    },
+    {
+      "name": "Imported service B",
+      "url": "https://service-b.example.local",
+      "category": "Imports",
+      "sortOrder": 10
+    }
+  ]
+}

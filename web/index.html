@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Overseer</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <header class="app-header">
+      <div class="header-inner">
+        <a class="brand" href="/" aria-label="Overseer — home">
+          <img src="/static/logo.svg" width="220" height="40" alt="" decoding="async" />
+        </a>
+        <div class="toolbar">
+          <div class="search-wrap">
+            <input
+              type="search"
+              id="search"
+              placeholder="Search name, URL, or category…"
+              autocomplete="off"
+            />
+          </div>
+          <button type="button" class="btn btn-primary" id="btn-add">Add app</button>
+          <button type="button" class="btn" id="btn-categories">Categories</button>
+          <button type="button" class="btn" id="btn-export">Export</button>
+          <button type="button" class="btn" id="btn-import-toggle">Import</button>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <div id="import-panel" class="import-panel" hidden>
+        <p class="hint" style="margin-top: 0">
+          Import merges skip bookmarks whose normalized URL already exists. Replace wipes all bookmarks first.
+        </p>
+        <label><span>JSON file</span><input type="file" id="import-file" accept="application/json,.json" /></label>
+        <label style="margin-top: 0.5rem; display: flex; gap: 0.5rem; align-items: center">
+          <span>Mode</span>
+          <select id="import-mode">
+            <option value="merge">Merge</option>
+            <option value="replace">Replace all</option>
+          </select>
+        </label>
+        <label style="margin-top: 0.5rem; display: flex; gap: 0.5rem; align-items: center">
+          <input type="checkbox" id="import-confirm-replace" />
+          <span>I understand replace deletes every bookmark</span>
+        </label>
+        <label style="margin-top: 0.5rem; display: block">
+          <span>Type <strong>REPLACE</strong> to confirm destructive import</span>
+          <input type="text" id="import-replace-token" autocomplete="off" placeholder="REPLACE" />
+        </label>
+        <div class="modal-actions" style="margin-top: 0.75rem; justify-content: flex-start">
+          <button type="button" class="btn btn-primary" id="btn-import-run">Run import</button>
+        </div>
+      </div>
+      <div id="content"></div>
+    </main>
+
+    <dialog id="modal" class="modal">
+      <form class="modal-body" id="bookmark-form">
+        <h2 id="modal-title">Add app</h2>
+        <input type="hidden" id="edit-id" value="" />
+        <div class="form-grid">
+          <label>
+            <span>Name</span>
+            <input type="text" id="f-name" required maxlength="200" />
+          </label>
+          <label>
+            <span>URL or host:port</span>
+            <input type="text" id="f-url" required maxlength="2048" placeholder="https://grafana.lan or 192.168.1.10:3000" />
+          </label>
+          <label>
+            <span>Category</span>
+            <input type="text" id="f-category" list="category-list" maxlength="120" placeholder="Media, Network, …" />
+            <datalist id="category-list"></datalist>
+          </label>
+          <label>
+            <span>Sort order</span>
+            <input type="text" id="f-sort" inputmode="numeric" pattern="[0-9]*" placeholder="0" />
+          </label>
+          <label>
+            <span>Icon (optional)</span>
+            <input type="file" id="f-icon" accept="image/*" />
+          </label>
+          <label id="clear-icon-wrap" style="display: none">
+            <span>Remove icon</span>
+            <select id="f-clear-icon">
+              <option value="no">Keep current icon</option>
+              <option value="yes">Remove icon</option>
+            </select>
+          </label>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn" id="btn-cancel">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="btn-save">Save</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="category-order-modal" class="modal">
+      <div class="modal-body">
+        <h2>Reorder categories</h2>
+        <p class="hint">Drag rows or use Up / Down. Order is saved for the whole dashboard (including empty categories until removed).</p>
+        <ul id="category-order-list" class="category-order-list"></ul>
+        <div class="modal-actions">
+          <button type="button" class="btn" id="btn-category-order-cancel">Cancel</button>
+          <button type="button" class="btn btn-primary" id="btn-category-order-save">Save order</button>
+        </div>
+      </div>
+    </dialog>
+
+    <script src="/static/app.js" defer></script>
+  </body>
+</html>

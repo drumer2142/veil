@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "exportedAt": "2026-05-11T12:00:00Z",
+  "categoryOrder": ["Monitoring", "Network", "Uncategorized"],
+  "bookmarks": [
+    {
+      "name": "Example Grafana",
+      "url": "http://grafana.lan:3000",
+      "category": "Monitoring",
+      "sortOrder": 0
+    },
+    {
+      "name": "Router admin",
+      "url": "http://192.168.1.1",
+      "category": "Network",
+      "sortOrder": 10
+    },
+    {
+      "name": "Docs (HTTPS)",
+      "url": "https://docs.example.com",
+      "category": "Network",
+      "sortOrder": 20
+    },
+    {
+      "name": "Homelab wiki",
+      "url": "http://wiki.internal:8080",
+      "category": "",
+      "sortOrder": 0,
+      "icon": {
+        "mime": "image/png",
+        "data": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+      }
+    }
+  ]
+}

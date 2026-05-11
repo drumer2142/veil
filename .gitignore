@@ -1,0 +1,11 @@
+# Runtime dashboard data (example JSON under data/ is tracked)
+data/bookmarks.db
+data/bookmarks.db-journal
+data/bookmarks.db-wal
+data/bookmarks.db-shm
+data/icons/
+
+*.sqlite
+*.sqlite-journal
+*.sqlite-wal
+*.sqlite-shm

@@ -32,6 +32,10 @@ func openDB(dir string) (*sql.DB, error) {
 		_ = db.Close()
 		return nil, err
 	}
+	if err := ensureBookmarkIconVersionColumn(db); err != nil {
+		_ = db.Close()
+		return nil, err
+	}
 	return db, nil
 }
 
@@ -54,5 +58,18 @@ CREATE TABLE IF NOT EXISTS settings (
 );
 INSERT OR IGNORE INTO settings (k, v) VALUES ('category_order', '[]');
 `)
+	return err
+}
+
+func ensureBookmarkIconVersionColumn(db *sql.DB) error {
+	var n int
+	err := db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('bookmarks') WHERE name = 'icon_version'`).Scan(&n)
+	if err != nil {
+		return err
+	}
+	if n > 0 {
+		return nil
+	}
+	_, err = db.Exec(`ALTER TABLE bookmarks ADD COLUMN icon_version INTEGER NOT NULL DEFAULT 0`)
 	return err
 }

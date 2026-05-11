@@ -38,6 +38,9 @@
   const THEME_KEY = "overseer-theme";
   const THEME_IDS = new Set(["dark", "light-orange"]);
 
+  /** Avoid stale bookmark JSON from HTTP cache after icon updates. */
+  const fetchNoStore = { cache: "no-store" };
+
   function getTheme() {
     try {
       const v = localStorage.getItem(THEME_KEY);
@@ -199,7 +202,8 @@
       img.className = "tile-icon";
       img.alt = "";
       img.loading = "lazy";
-      img.src = `/api/bookmarks/${b.id}/icon`;
+      const iconRev = typeof b.iconRev === "number" ? b.iconRev : Number(b.iconRev) || 0;
+      img.src = `/api/bookmarks/${b.id}/icon?v=${iconRev}`;
       link.appendChild(img);
     } else {
       const ph = document.createElement("div");
@@ -240,9 +244,9 @@
 
   async function load() {
     const [bRes, cRes, oRes] = await Promise.all([
-      fetch("/api/bookmarks"),
-      fetch("/api/categories"),
-      fetch("/api/category-order"),
+      fetch("/api/bookmarks", fetchNoStore),
+      fetch("/api/categories", fetchNoStore),
+      fetch("/api/category-order", fetchNoStore),
     ]);
     if (!bRes.ok) return toast("Failed to load bookmarks", true);
     bookmarks = await bRes.json();
@@ -558,6 +562,12 @@
     els.themeSelect.value = initialTheme;
     els.themeSelect.addEventListener("change", () => applyTheme(els.themeSelect.value));
   }
+
+  window.addEventListener("pageshow", (ev) => {
+    if (ev.persisted) {
+      load().catch(() => toast("Failed to load", true));
+    }
+  });
 
   load().catch(() => toast("Failed to load", true));
 })();

@@ -21,6 +21,7 @@ type Bookmark struct {
 	URL       string `json:"url"`
 	Category  string `json:"category"`
 	HasIcon   bool   `json:"hasIcon"`
+	IconRev   int64  `json:"iconRev"`
 	SortOrder int    `json:"sortOrder"`
 	CreatedAt string `json:"createdAt"`
 }
@@ -43,7 +44,7 @@ func (s *appStore) ListBookmarks() ([]Bookmark, error) {
 	rows, err := s.db.Query(`
 SELECT id, name, url, category,
 	CASE WHEN icon_path IS NOT NULL AND TRIM(icon_path) != '' THEN 1 ELSE 0 END,
-	sort_order, created_at
+	sort_order, created_at, COALESCE(icon_version, 0)
 FROM bookmarks
 ORDER BY category, sort_order, name COLLATE NOCASE, id
 `)
@@ -55,7 +56,7 @@ ORDER BY category, sort_order, name COLLATE NOCASE, id
 	for rows.Next() {
 		var b Bookmark
 		var hasIcon int
-		if err := rows.Scan(&b.ID, &b.Name, &b.URL, &b.Category, &hasIcon, &b.SortOrder, &b.CreatedAt); err != nil {
+		if err := rows.Scan(&b.ID, &b.Name, &b.URL, &b.Category, &hasIcon, &b.SortOrder, &b.CreatedAt, &b.IconRev); err != nil {
 			return nil, err
 		}
 		b.HasIcon = hasIcon != 0
@@ -68,9 +69,9 @@ func (s *appStore) GetBookmark(id int64) (Bookmark, string, error) {
 	var b Bookmark
 	var iconPath sql.NullString
 	err := s.db.QueryRow(`
-SELECT id, name, url, category, icon_path, sort_order, created_at
+SELECT id, name, url, category, icon_path, sort_order, created_at, COALESCE(icon_version, 0)
 FROM bookmarks WHERE id = ?
-`, id).Scan(&b.ID, &b.Name, &b.URL, &b.Category, &iconPath, &b.SortOrder, &b.CreatedAt)
+`, id).Scan(&b.ID, &b.Name, &b.URL, &b.Category, &iconPath, &b.SortOrder, &b.CreatedAt, &b.IconRev)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Bookmark{}, "", errNotFound
 	}
@@ -135,7 +136,10 @@ VALUES (?, ?, ?, NULL, ?, ?)
 			_, _ = s.db.Exec(`DELETE FROM bookmarks WHERE id = ?`, id)
 			return Bookmark{}, err
 		}
-		if _, err := s.db.Exec(`UPDATE bookmarks SET icon_path = ? WHERE id = ?`, iconPath, id); err != nil {
+		if _, err := s.db.Exec(
+			`UPDATE bookmarks SET icon_path = ?, icon_version = COALESCE(icon_version, 0) + 1 WHERE id = ?`,
+			iconPath, id,
+		); err != nil {
 			_ = os.Remove(iconPath)
 			_, _ = s.db.Exec(`DELETE FROM bookmarks WHERE id = ?`, id)
 			return Bookmark{}, err
@@ -168,7 +172,7 @@ func (s *appStore) UpdateBookmark(id int64, name, rawURL, category string, sortO
 		if oldPath != "" && oldPath != newPath {
 			s.removeIconFileOnDisk(oldPath)
 		}
-		if _, err := s.db.Exec(`UPDATE bookmarks SET name=?, url=?, category=?, icon_path=?, sort_order=? WHERE id=?`,
+		if _, err := s.db.Exec(`UPDATE bookmarks SET name=?, url=?, category=?, icon_path=?, sort_order=?, icon_version = COALESCE(icon_version, 0) + 1 WHERE id=?`,
 			name, u, cat, newPath, sortOrder, id); err != nil {
 			_ = os.Remove(newPath)
 			return Bookmark{}, err
@@ -213,7 +217,10 @@ func (s *appStore) ClearIcon(id int64) error {
 		path = strings.TrimSpace(p.String)
 	}
 	// Clear DB first so the app never references a file we are about to delete.
-	if _, err := s.db.Exec(`UPDATE bookmarks SET icon_path = NULL WHERE id=?`, id); err != nil {
+	if _, err := s.db.Exec(
+		`UPDATE bookmarks SET icon_path = NULL, icon_version = COALESCE(icon_version, 0) + 1 WHERE id=?`,
+		id,
+	); err != nil {
 		return err
 	}
 	s.removeIconFileOnDisk(path)

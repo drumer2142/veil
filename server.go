@@ -300,7 +300,11 @@ func (s *server) serveIcon(w http.ResponseWriter, r *http.Request, id int64) {
 		mt = "application/octet-stream"
 	}
 	w.Header().Set("Content-Type", mt)
-	w.Header().Set("Cache-Control", "public, max-age=3600")
+	// Icons can be replaced in place; avoid any intermediary or browser caching stale bytes.
+	w.Header().Set("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
+	w.Header().Set("Pragma", "no-cache")
+	w.Header().Set("Expires", "0")
+	w.Header().Set("Surrogate-Control", "no-store")
 	_, _ = io.Copy(w, f)
 }
 

@@ -323,7 +323,9 @@ main {
   width: 48px;
   height: 48px;
   border-radius: 12px;
-  object-fit: cover;
+  /* Show full icon without cropping, while keeping it centered in the tile. */
+  object-fit: contain;
+  object-position: center;
   background: var(--surface2);
   border: 1px solid var(--border);
 }

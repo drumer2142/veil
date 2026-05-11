@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -165,7 +166,7 @@ func (s *appStore) UpdateBookmark(id int64, name, rawURL, category string, sortO
 			return Bookmark{}, err
 		}
 		if oldPath != "" && oldPath != newPath {
-			_ = os.Remove(oldPath)
+			s.removeIconFileOnDisk(oldPath)
 		}
 		if _, err := s.db.Exec(`UPDATE bookmarks SET name=?, url=?, category=?, icon_path=?, sort_order=? WHERE id=?`,
 			name, u, cat, newPath, sortOrder, id); err != nil {
@@ -181,16 +182,42 @@ func (s *appStore) UpdateBookmark(id int64, name, rawURL, category string, sortO
 	return s.bookmarkByID(id)
 }
 
+// removeIconFileOnDisk deletes an icon file only if it lives under iconsDir (safety).
+func (s *appStore) removeIconFileOnDisk(path string) {
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return
+	}
+	cp := filepath.Clean(path)
+	base := filepath.Clean(s.iconsDir)
+	rel, err := filepath.Rel(base, cp)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		log.Printf("icons: skip remove, path outside icons dir: %q", path)
+		return
+	}
+	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+		log.Printf("icons: could not remove file %q: %v", path, err)
+	}
+}
+
 func (s *appStore) ClearIcon(id int64) error {
 	var p sql.NullString
 	if err := s.db.QueryRow(`SELECT icon_path FROM bookmarks WHERE id=?`, id).Scan(&p); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return errNotFound
+		}
 		return err
 	}
-	if p.Valid && p.String != "" {
-		_ = os.Remove(p.String)
+	path := ""
+	if p.Valid {
+		path = strings.TrimSpace(p.String)
 	}
-	_, err := s.db.Exec(`UPDATE bookmarks SET icon_path = NULL WHERE id=?`, id)
-	return err
+	// Clear DB first so the app never references a file we are about to delete.
+	if _, err := s.db.Exec(`UPDATE bookmarks SET icon_path = NULL WHERE id=?`, id); err != nil {
+		return err
+	}
+	s.removeIconFileOnDisk(path)
+	return nil
 }
 
 func (s *appStore) DeleteBookmark(id int64) error {
@@ -205,8 +232,8 @@ func (s *appStore) DeleteBookmark(id int64) error {
 	if _, err := s.db.Exec(`DELETE FROM bookmarks WHERE id=?`, id); err != nil {
 		return err
 	}
-	if p.Valid && p.String != "" {
-		_ = os.Remove(p.String)
+	if p.Valid && strings.TrimSpace(p.String) != "" {
+		s.removeIconFileOnDisk(p.String)
 	}
 	return nil
 }
@@ -232,7 +259,7 @@ func (s *appStore) DeleteAllBookmarks() error {
 		return err
 	}
 	for _, p := range paths {
-		_ = os.Remove(p)
+		s.removeIconFileOnDisk(p)
 	}
 	return nil
 }

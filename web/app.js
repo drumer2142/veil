@@ -92,6 +92,21 @@
     return hay.includes(q);
   }
 
+  function makeCategorySection(key, map) {
+    const items = map.get(key) ?? [];
+    const section = document.createElement("section");
+    section.className = "category-block";
+    const h2 = document.createElement("h2");
+    h2.textContent = key;
+    const grid = document.createElement("div");
+    grid.className = "tile-grid";
+    for (const b of items) {
+      grid.appendChild(tileEl(b));
+    }
+    section.append(h2, grid);
+    return section;
+  }
+
   function render() {
     const q = els.search.value.trim().toLowerCase();
     const filtered = bookmarks.filter((b) => matchesSearch(b, q));
@@ -109,23 +124,29 @@
       return;
     }
 
-    const frag = document.createDocumentFragment();
-    for (const key of keys) {
-      const items = map.get(key) ?? [];
-      if (items.length === 0) continue;
-      const section = document.createElement("section");
-      section.className = "category-block";
-      const h2 = document.createElement("h2");
-      h2.textContent = key;
-      const grid = document.createElement("div");
-      grid.className = "tile-grid";
-      for (const b of items) {
-        grid.appendChild(tileEl(b));
+    const visibleKeys = keys.filter((k) => (map.get(k) ?? []).length > 0);
+    const layout = document.createElement("div");
+    layout.className = "categories-layout";
+
+    for (let i = 0; i < visibleKeys.length; i += 2) {
+      const row = document.createElement("div");
+      row.className = "category-row";
+      const left = document.createElement("div");
+      left.className = "category-col";
+      left.appendChild(makeCategorySection(visibleKeys[i], map));
+      if (i + 1 < visibleKeys.length) {
+        const right = document.createElement("div");
+        right.className = "category-col";
+        right.appendChild(makeCategorySection(visibleKeys[i + 1], map));
+        row.append(left, right);
+      } else {
+        row.classList.add("category-row--single");
+        row.appendChild(left);
       }
-      section.append(h2, grid);
-      frag.appendChild(section);
+      layout.appendChild(row);
     }
-    els.content.replaceChildren(frag);
+
+    els.content.replaceChildren(layout);
   }
 
   function tileEl(b) {

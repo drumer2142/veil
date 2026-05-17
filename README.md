@@ -91,3 +91,7 @@ go build -o veil .
 | `-data` | `./data` | Directory for database and icons |
 
 To back up manually, copy the whole `<data>` directory while the process is stopped (safest).
+
+## License
+
+[MIT](LICENSE) — Copyright (c) 2026 drumer2142

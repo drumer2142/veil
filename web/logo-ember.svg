@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 40" fill="none" role="img" aria-labelledby="logoTitle">
+  <title id="logoTitle">Veil</title>
+  <defs>
+    <linearGradient id="emberVg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffa31a"/>
+      <stop offset="100%" stop-color="#ffc656"/>
+    </linearGradient>
+    <filter id="emberVGlow" x="-35%" y="-35%" width="170%" height="170%">
+      <feGaussianBlur stdDeviation="1" result="b"/>
+      <feMerge>
+        <feMergeNode in="b"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  <g filter="url(#emberVGlow)" transform="translate(2,2)">
+    <rect x="0" y="0" width="36" height="36" rx="10" fill="#1b1b1b" stroke="url(#emberVg)" stroke-width="1.5"/>
+    <rect x="5" y="5" width="12" height="12" rx="3" fill="url(#emberVg)" opacity="0.95"/>
+    <rect x="19" y="5" width="12" height="12" rx="3" fill="url(#emberVg)" opacity="0.55"/>
+    <rect x="5" y="19" width="12" height="12" rx="3" fill="url(#emberVg)" opacity="0.55"/>
+    <rect x="19" y="19" width="12" height="12" rx="3" fill="url(#emberVg)" opacity="0.95"/>
+    <path
+      d="M 8 34 Q 18 26 28 34"
+      stroke="url(#emberVg)"
+      stroke-width="2"
+      stroke-linecap="round"
+      fill="none"
+      opacity="0.9"
+    />
+  </g>
+  <text
+    x="46"
+    y="27.5"
+    fill="#f0f0f0"
+    font-family="ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif"
+    font-size="21.5"
+    font-weight="700"
+    letter-spacing="-0.03em"
+  >Veil</text>
+</svg>

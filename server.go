@@ -32,6 +32,7 @@ type exportBookmark struct {
 	URL       string       `json:"url"`
 	Category  string       `json:"category"`
 	SortOrder int          `json:"sortOrder"`
+	ExtraURLs []string     `json:"extraUrls,omitempty"`
 	Icon      *iconPayload `json:"icon,omitempty"`
 }
 
@@ -55,7 +56,12 @@ type importBookmark struct {
 	URL       string       `json:"url"`
 	Category  string       `json:"category"`
 	SortOrder int          `json:"sortOrder"`
+	ExtraURLs []string     `json:"extraUrls,omitempty"`
 	Icon      *iconPayload `json:"icon,omitempty"`
+}
+
+type createExtraJSON struct {
+	URL string `json:"url"`
 }
 
 type createBookmarkJSON struct {
@@ -108,6 +114,7 @@ func (s *server) routes() {
 	s.mux.HandleFunc("GET /api/bookmarks", s.handleListBookmarks)
 	s.mux.HandleFunc("POST /api/bookmarks", s.handleCreateBookmark)
 	s.mux.HandleFunc("GET /api/bookmarks/", s.handleBookmarkSubroutes)
+	s.mux.HandleFunc("POST /api/bookmarks/", s.handleBookmarkSubroutes)
 	s.mux.HandleFunc("PUT /api/bookmarks/", s.handleBookmarkSubroutes)
 	s.mux.HandleFunc("DELETE /api/bookmarks/", s.handleBookmarkSubroutes)
 
@@ -256,6 +263,30 @@ func (s *server) handleBookmarkSubroutes(w http.ResponseWriter, r *http.Request)
 		s.serveIcon(w, r, id)
 		return
 	}
+	if len(parts) == 2 && parts[1] == "extras" {
+		switch r.Method {
+		case http.MethodGet:
+			s.listExtras(w, r, id)
+		case http.MethodPost:
+			s.createExtra(w, r, id)
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+		return
+	}
+	if len(parts) == 3 && parts[1] == "extras" {
+		extraID, err := strconv.ParseInt(parts[2], 10, 64)
+		if err != nil || extraID < 1 {
+			http.NotFound(w, r)
+			return
+		}
+		if r.Method != http.MethodDelete {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		s.deleteExtra(w, r, id, extraID)
+		return
+	}
 	if len(parts) != 1 {
 		http.NotFound(w, r)
 		return
@@ -268,6 +299,37 @@ func (s *server) handleBookmarkSubroutes(w http.ResponseWriter, r *http.Request)
 	default:
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 	}
+}
+
+func (s *server) listExtras(w http.ResponseWriter, r *http.Request, bookmarkID int64) {
+	list, err := s.store.ListExtras(bookmarkID)
+	if err != nil {
+		writeBookmarkErr(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, list)
+}
+
+func (s *server) createExtra(w http.ResponseWriter, r *http.Request, bookmarkID int64) {
+	var body createExtraJSON
+	if err := json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(&body); err != nil {
+		http.Error(w, "invalid json", http.StatusBadRequest)
+		return
+	}
+	e, err := s.store.CreateExtra(bookmarkID, body.URL)
+	if err != nil {
+		writeBookmarkErr(w, err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, e)
+}
+
+func (s *server) deleteExtra(w http.ResponseWriter, r *http.Request, bookmarkID, extraID int64) {
+	if err := s.store.DeleteExtra(bookmarkID, extraID); err != nil {
+		writeBookmarkErr(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (s *server) serveIcon(w http.ResponseWriter, r *http.Request, id int64) {
@@ -403,13 +465,19 @@ func (s *server) handleExport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	doc := exportDoc{
-		Version:        1,
+		Version:        2,
 		ExportedAt:     time.Now().UTC().Format(time.RFC3339),
 		CategoryOrder:  catOrder,
 		Bookmarks:      make([]exportBookmark, 0, len(list)),
 	}
 	for _, b := range list {
 		eb := exportBookmark{Name: b.Name, URL: b.URL, Category: b.Category, SortOrder: b.SortOrder}
+		if len(b.Extras) > 0 {
+			eb.ExtraURLs = make([]string, len(b.Extras))
+			for i, e := range b.Extras {
+				eb.ExtraURLs[i] = e.URL
+			}
+		}
 		_, iconPath, err := s.store.GetBookmark(b.ID)
 		if err != nil {
 			continue
@@ -428,7 +496,7 @@ func (s *server) handleExport(w http.ResponseWriter, r *http.Request) {
 		doc.Bookmarks = append(doc.Bookmarks, eb)
 	}
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	w.Header().Set("Content-Disposition", `attachment; filename="dashboard-export.json"`)
+	w.Header().Set("Content-Disposition", `attachment; filename="veil-export.json"`)
 	enc := json.NewEncoder(w)
 	enc.SetIndent("", "  ")
 	if err := enc.Encode(doc); err != nil {
@@ -460,7 +528,7 @@ func (s *server) handleImport(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid json", http.StatusBadRequest)
 		return
 	}
-	if doc.Version != 0 && doc.Version != 1 {
+	if doc.Version != 0 && doc.Version != 1 && doc.Version != 2 {
 		http.Error(w, "unsupported export version", http.StatusBadRequest)
 		return
 	}
@@ -512,9 +580,15 @@ func (s *server) handleImport(w http.ResponseWriter, r *http.Request) {
 				iconMime = http.DetectContentType(raw)
 			}
 		}
-		if _, errCreate := s.store.CreateBookmark(name, u, row.Category, row.SortOrder, iconR, iconMime); errCreate != nil {
+		created, errCreate := s.store.CreateBookmark(name, u, row.Category, row.SortOrder, iconR, iconMime)
+		if errCreate != nil {
 			skipped++
 			continue
+		}
+		for _, rawExtra := range row.ExtraURLs {
+			if _, err := s.store.CreateExtra(created.ID, rawExtra); err != nil {
+				continue
+			}
 		}
 		imported++
 	}
@@ -578,6 +652,8 @@ func writeBookmarkErr(w http.ResponseWriter, err error) {
 		http.Error(w, "bad request", http.StatusBadRequest)
 	case errors.Is(err, errNotFound):
 		http.Error(w, "not found", http.StatusNotFound)
+	case errors.Is(err, errDuplicateURL):
+		http.Error(w, "duplicate url", http.StatusBadRequest)
 	default:
 		http.Error(w, "server error", http.StatusInternalServerError)
 	}

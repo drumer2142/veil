@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-1 -1 42 42" fill="none" role="img" aria-label="Veil">
+  <defs>
+    <linearGradient id="roseIconVg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#940032"/>
+      <stop offset="100%" stop-color="#dc1e5e"/>
+    </linearGradient>
+    <filter id="roseIconGlow" x="-35%" y="-35%" width="170%" height="170%">
+      <feGaussianBlur stdDeviation="1" result="b"/>
+      <feMerge>
+        <feMergeNode in="b"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  <g filter="url(#roseIconGlow)" transform="translate(2,2)">
+    <rect x="0" y="0" width="36" height="36" rx="10" fill="#fffcfd" stroke="url(#roseIconVg)" stroke-width="1.5"/>
+    <rect x="5" y="5" width="12" height="12" rx="3" fill="url(#roseIconVg)" opacity="0.95"/>
+    <rect x="19" y="5" width="12" height="12" rx="3" fill="url(#roseIconVg)" opacity="0.55"/>
+    <rect x="5" y="19" width="12" height="12" rx="3" fill="url(#roseIconVg)" opacity="0.55"/>
+    <rect x="19" y="19" width="12" height="12" rx="3" fill="url(#roseIconVg)" opacity="0.95"/>
+    <path
+      d="M 8 34 Q 18 26 28 34"
+      stroke="url(#roseIconVg)"
+      stroke-width="2"
+      stroke-linecap="round"
+      fill="none"
+      opacity="0.9"
+    />
+  </g>
+</svg>

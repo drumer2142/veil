@@ -33,17 +33,36 @@
     btnCategoryOrderSave: $("#btn-category-order-save"),
     themeSelect: $("#theme-select"),
     logoImg: document.querySelector(".brand img"),
+    extrasBackdrop: $("#extras-backdrop"),
+    extrasDrawer: $("#extras-drawer"),
+    extrasDrawerTitle: $("#extras-drawer-title"),
+    extrasList: $("#extras-list"),
+    extrasForm: $("#extras-form"),
+    extrasUrl: $("#extras-url"),
+    extrasClose: $("#extras-close"),
   };
 
-  const THEME_KEY = "overseer-theme";
-  const THEME_IDS = new Set(["dark", "light-orange"]);
+  const THEME_KEY = "veil-theme";
+  const LEGACY_THEME_KEY = "overseer-theme";
+  const THEME_IDS = new Set(["dark", "light-orange", "rose", "ember"]);
 
   /** Avoid stale bookmark JSON from HTTP cache after icon updates. */
   const fetchNoStore = { cache: "no-store" };
 
   function getTheme() {
     try {
-      const v = localStorage.getItem(THEME_KEY);
+      let v = localStorage.getItem(THEME_KEY);
+      if (!v) {
+        const legacy = localStorage.getItem(LEGACY_THEME_KEY);
+        if (legacy && THEME_IDS.has(legacy)) {
+          v = legacy;
+          try {
+            localStorage.setItem(THEME_KEY, v);
+          } catch (e2) {
+            /* ignore */
+          }
+        }
+      }
       if (THEME_IDS.has(v)) return v;
     } catch (e) {
       /* ignore */
@@ -61,12 +80,17 @@
     }
     if (els.themeSelect) els.themeSelect.value = t;
     if (els.logoImg) {
-      els.logoImg.src = t === "light-orange" ? "/static/logo-light-orange.svg" : "/static/logo.svg";
+      if (t === "light-orange") els.logoImg.src = "/static/logo-light-orange.svg";
+      else if (t === "rose") els.logoImg.src = "/static/logo-rose.svg";
+      else if (t === "ember") els.logoImg.src = "/static/logo-ember.svg";
+      else els.logoImg.src = "/static/logo.svg";
     }
   }
 
-  /** @type {{ id:number; name:string; url:string; category:string; hasIcon:boolean; sortOrder:number; createdAt:string }[]} */
+  /** @type {{ id:number; name:string; url:string; category:string; hasIcon:boolean; sortOrder:number; createdAt:string; extras?:{id:number;url:string}[] }[]} */
   let bookmarks = [];
+  /** @type {typeof bookmarks[0]|null} */
+  let extrasBookmark = null;
   /** @type {string[]} */
   let categories = [];
   /** @type {string[]} */
@@ -120,7 +144,8 @@
 
   function matchesSearch(b, q) {
     if (!q) return true;
-    const hay = `${b.name}\n${b.url}\n${b.category}`.toLowerCase();
+    const extraHay = (b.extras ?? []).map((e) => e.url).join("\n");
+    const hay = `${b.name}\n${b.url}\n${b.category}\n${extraHay}`.toLowerCase();
     return hay.includes(q);
   }
 
@@ -221,6 +246,11 @@
     actions.className = "tile-actions";
     actions.onclick = (e) => e.preventDefault();
 
+    const btnExtra = document.createElement("button");
+    btnExtra.type = "button";
+    btnExtra.textContent = "Add extra";
+    btnExtra.addEventListener("click", () => openExtrasDrawer(b));
+
     const btnEdit = document.createElement("button");
     btnEdit.type = "button";
     btnEdit.textContent = "Edit";
@@ -237,9 +267,134 @@
       toast("Deleted");
     });
 
-    actions.append(btnEdit, btnDel);
+    actions.append(btnExtra, btnEdit, btnDel);
     wrap.append(link, actions);
     return wrap;
+  }
+
+  function findBookmark(id) {
+    return bookmarks.find((b) => b.id === id) ?? null;
+  }
+
+  function patchBookmarkExtras(id, extras) {
+    const b = findBookmark(id);
+    if (b) b.extras = extras;
+    if (extrasBookmark && extrasBookmark.id === id) {
+      extrasBookmark = { ...extrasBookmark, extras };
+    }
+  }
+
+  function renderExtrasList(extras) {
+    els.extrasList.replaceChildren();
+    if (!extras || extras.length === 0) {
+      const p = document.createElement("p");
+      p.className = "extras-empty";
+      p.textContent = "No extra URLs yet.";
+      els.extrasList.appendChild(p);
+      return;
+    }
+    for (const e of extras) {
+      const row = document.createElement("div");
+      row.className = "extras-item";
+      row.setAttribute("role", "listitem");
+
+      const a = document.createElement("a");
+      a.className = "extras-item-link";
+      a.href = e.url;
+      a.target = "_blank";
+      a.rel = "noopener noreferrer";
+      a.textContent = e.url;
+
+      const btnDel = document.createElement("button");
+      btnDel.type = "button";
+      btnDel.textContent = "Delete";
+      btnDel.addEventListener("click", () => deleteExtra(e.id));
+
+      row.append(a, btnDel);
+      els.extrasList.appendChild(row);
+    }
+  }
+
+  async function refreshExtrasForBookmark(id) {
+    const res = await fetch(`/api/bookmarks/${id}/extras`, fetchNoStore);
+    if (!res.ok) {
+      toast("Failed to load extra URLs", true);
+      return null;
+    }
+    const extras = await res.json();
+    patchBookmarkExtras(id, extras);
+    if (extrasBookmark && extrasBookmark.id === id) {
+      renderExtrasList(extras);
+    }
+    return extras;
+  }
+
+  function openExtrasDrawer(b) {
+    extrasBookmark = b;
+    els.extrasDrawerTitle.textContent = `Extra URLs — ${b.name}`;
+    els.extrasUrl.value = "";
+    renderExtrasList(b.extras ?? []);
+    els.extrasBackdrop.hidden = false;
+    els.extrasBackdrop.setAttribute("aria-hidden", "false");
+    els.extrasDrawer.classList.add("is-open");
+    els.extrasDrawer.setAttribute("aria-hidden", "false");
+    document.body.classList.add("extras-open");
+    els.extrasUrl.focus();
+    if (!b.extras) {
+      refreshExtrasForBookmark(b.id).catch(() => toast("Failed to load extra URLs", true));
+    }
+  }
+
+  function closeExtrasDrawer() {
+    extrasBookmark = null;
+    els.extrasBackdrop.hidden = true;
+    els.extrasBackdrop.setAttribute("aria-hidden", "true");
+    els.extrasDrawer.classList.remove("is-open");
+    els.extrasDrawer.setAttribute("aria-hidden", "true");
+    document.body.classList.remove("extras-open");
+  }
+
+  async function addExtra(url) {
+    if (!extrasBookmark) return;
+    const res = await fetch(`/api/bookmarks/${extrasBookmark.id}/extras`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url }),
+    });
+    if (!res.ok) {
+      const t = await res.text();
+      return toast(t || "Could not add URL", true);
+    }
+    const created = await res.json();
+    const current = extrasBookmark.extras ?? [];
+    const next = [...current, created];
+    patchBookmarkExtras(extrasBookmark.id, next);
+    renderExtrasList(next);
+    els.extrasUrl.value = "";
+    els.extrasUrl.focus();
+    toast("URL added");
+  }
+
+  async function deleteExtra(extraId) {
+    if (!extrasBookmark) return;
+    const res = await fetch(`/api/bookmarks/${extrasBookmark.id}/extras/${extraId}`, {
+      method: "DELETE",
+    });
+    if (!res.ok) {
+      const t = await res.text();
+      return toast(t || "Delete failed", true);
+    }
+    const next = (extrasBookmark.extras ?? []).filter((e) => e.id !== extraId);
+    patchBookmarkExtras(extrasBookmark.id, next);
+    renderExtrasList(next);
+    toast("URL removed");
+  }
+
+  async function onExtrasSubmit(e) {
+    e.preventDefault();
+    const url = els.extrasUrl.value.trim();
+    if (!url) return;
+    await addExtra(url);
   }
 
   async function load() {
@@ -262,6 +417,14 @@
       categoryOrder = [];
     }
     refreshCategoryDatalist();
+    if (extrasBookmark) {
+      const fresh = findBookmark(extrasBookmark.id);
+      if (!fresh) closeExtrasDrawer();
+      else {
+        extrasBookmark = fresh;
+        renderExtrasList(fresh.extras ?? []);
+      }
+    }
     render();
   }
 
@@ -500,7 +663,7 @@
     const blob = await res.blob();
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = "dashboard-export.json";
+    a.download = "veil-export.json";
     a.click();
     URL.revokeObjectURL(a.href);
     toast("Export started");
@@ -555,6 +718,12 @@
   els.btnCategories.addEventListener("click", openCategoryOrderModal);
   els.btnCategoryOrderCancel.addEventListener("click", () => els.categoryOrderModal.close());
   els.btnCategoryOrderSave.addEventListener("click", () => saveCategoryOrder().catch(() => toast("Save failed", true)));
+  els.extrasClose.addEventListener("click", closeExtrasDrawer);
+  els.extrasBackdrop.addEventListener("click", closeExtrasDrawer);
+  els.extrasForm.addEventListener("submit", (e) => onExtrasSubmit(e).catch(() => toast("Add failed", true)));
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && extrasBookmark) closeExtrasDrawer();
+  });
 
   const initialTheme = getTheme();
   applyTheme(initialTheme);

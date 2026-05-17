@@ -36,6 +36,10 @@ func openDB(dir string) (*sql.DB, error) {
 		_ = db.Close()
 		return nil, err
 	}
+	if err := ensureBookmarkExtrasTable(db); err != nil {
+		_ = db.Close()
+		return nil, err
+	}
 	return db, nil
 }
 
@@ -71,5 +75,18 @@ func ensureBookmarkIconVersionColumn(db *sql.DB) error {
 		return nil
 	}
 	_, err = db.Exec(`ALTER TABLE bookmarks ADD COLUMN icon_version INTEGER NOT NULL DEFAULT 0`)
+	return err
+}
+
+func ensureBookmarkExtrasTable(db *sql.DB) error {
+	_, err := db.Exec(`
+CREATE TABLE IF NOT EXISTS bookmark_extras (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	bookmark_id INTEGER NOT NULL REFERENCES bookmarks(id) ON DELETE CASCADE,
+	url TEXT NOT NULL,
+	created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_bookmark_extras_bookmark ON bookmark_extras(bookmark_id, id);
+`)
 	return err
 }

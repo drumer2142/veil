@@ -30,6 +30,6 @@ func main() {
 	st := newStore(db, dataPath)
 	srv := newServer(st)
 
-	log.Printf("dashboard listening on %s (data: %s)", *addr, dataPath)
+	log.Printf("veil listening on %s (data: %s)", *addr, dataPath)
 	log.Fatal(http.ListenAndServe(*addr, srv))
 }

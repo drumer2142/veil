@@ -15,15 +15,23 @@ import (
 
 const uncategorizedLabel = "Uncategorized"
 
+type BookmarkExtra struct {
+	ID         int64  `json:"id"`
+	BookmarkID int64  `json:"bookmarkId"`
+	URL        string `json:"url"`
+	CreatedAt  string `json:"createdAt"`
+}
+
 type Bookmark struct {
-	ID        int64  `json:"id"`
-	Name      string `json:"name"`
-	URL       string `json:"url"`
-	Category  string `json:"category"`
-	HasIcon   bool   `json:"hasIcon"`
-	IconRev   int64  `json:"iconRev"`
-	SortOrder int    `json:"sortOrder"`
-	CreatedAt string `json:"createdAt"`
+	ID        int64           `json:"id"`
+	Name      string          `json:"name"`
+	URL       string          `json:"url"`
+	Category  string          `json:"category"`
+	HasIcon   bool            `json:"hasIcon"`
+	IconRev   int64           `json:"iconRev"`
+	SortOrder int             `json:"sortOrder"`
+	CreatedAt string          `json:"createdAt"`
+	Extras    []BookmarkExtra `json:"extras,omitempty"`
 }
 
 type appStore struct {
@@ -62,7 +70,138 @@ ORDER BY category, sort_order, name COLLATE NOCASE, id
 		b.HasIcon = hasIcon != 0
 		out = append(out, b)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	if err := s.attachExtras(out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (s *appStore) attachExtras(bookmarks []Bookmark) error {
+	if len(bookmarks) == 0 {
+		return nil
+	}
+	ids := make([]int64, len(bookmarks))
+	for i := range bookmarks {
+		ids[i] = bookmarks[i].ID
+	}
+	byID, err := s.listExtrasByBookmarkIDs(ids)
+	if err != nil {
+		return err
+	}
+	for i := range bookmarks {
+		extras := byID[bookmarks[i].ID]
+		if len(extras) > 0 {
+			bookmarks[i].Extras = extras
+		}
+	}
+	return nil
+}
+
+func (s *appStore) listExtrasByBookmarkIDs(bookmarkIDs []int64) (map[int64][]BookmarkExtra, error) {
+	out := make(map[int64][]BookmarkExtra)
+	if len(bookmarkIDs) == 0 {
+		return out, nil
+	}
+	placeholders := make([]string, len(bookmarkIDs))
+	args := make([]any, len(bookmarkIDs))
+	for i, id := range bookmarkIDs {
+		placeholders[i] = "?"
+		args[i] = id
+	}
+	q := fmt.Sprintf(`
+SELECT id, bookmark_id, url, created_at
+FROM bookmark_extras
+WHERE bookmark_id IN (%s)
+ORDER BY bookmark_id, id
+`, strings.Join(placeholders, ","))
+	rows, err := s.db.Query(q, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var e BookmarkExtra
+		if err := rows.Scan(&e.ID, &e.BookmarkID, &e.URL, &e.CreatedAt); err != nil {
+			return nil, err
+		}
+		out[e.BookmarkID] = append(out[e.BookmarkID], e)
+	}
 	return out, rows.Err()
+}
+
+func (s *appStore) ListExtras(bookmarkID int64) ([]BookmarkExtra, error) {
+	if _, _, err := s.GetBookmark(bookmarkID); err != nil {
+		return nil, err
+	}
+	byID, err := s.listExtrasByBookmarkIDs([]int64{bookmarkID})
+	if err != nil {
+		return nil, err
+	}
+	extras := byID[bookmarkID]
+	if extras == nil {
+		return []BookmarkExtra{}, nil
+	}
+	return extras, nil
+}
+
+func (s *appStore) bookmarkURLsForDedup(bookmarkID int64) (map[string]struct{}, error) {
+	b, _, err := s.GetBookmark(bookmarkID)
+	if err != nil {
+		return nil, err
+	}
+	seen := map[string]struct{}{b.URL: {}}
+	extras, err := s.ListExtras(bookmarkID)
+	if err != nil {
+		return nil, err
+	}
+	for _, e := range extras {
+		seen[e.URL] = struct{}{}
+	}
+	return seen, nil
+}
+
+func (s *appStore) CreateExtra(bookmarkID int64, rawURL string) (BookmarkExtra, error) {
+	u, err := normalizeURL(rawURL)
+	if err != nil {
+		return BookmarkExtra{}, err
+	}
+	seen, err := s.bookmarkURLsForDedup(bookmarkID)
+	if err != nil {
+		return BookmarkExtra{}, err
+	}
+	if _, ok := seen[u]; ok {
+		return BookmarkExtra{}, errDuplicateURL
+	}
+	now := time.Now().UTC().Format(time.RFC3339)
+	res, err := s.db.Exec(`
+INSERT INTO bookmark_extras (bookmark_id, url, created_at) VALUES (?, ?, ?)
+`, bookmarkID, u, now)
+	if err != nil {
+		return BookmarkExtra{}, err
+	}
+	id, err := res.LastInsertId()
+	if err != nil {
+		return BookmarkExtra{}, err
+	}
+	return BookmarkExtra{ID: id, BookmarkID: bookmarkID, URL: u, CreatedAt: now}, nil
+}
+
+func (s *appStore) DeleteExtra(bookmarkID, extraID int64) error {
+	res, err := s.db.Exec(`DELETE FROM bookmark_extras WHERE id = ? AND bookmark_id = ?`, extraID, bookmarkID)
+	if err != nil {
+		return err
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return errNotFound
+	}
+	return nil
 }
 
 func (s *appStore) GetBookmark(id int64) (Bookmark, string, error) {

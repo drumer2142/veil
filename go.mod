@@ -1,4 +1,4 @@
-module overseer
+module veil
 
 go 1.22
 

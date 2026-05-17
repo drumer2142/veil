@@ -3,26 +3,36 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Overseer</title>
+    <title>Veil</title>
     <script>
       (function () {
-        var KEY = "overseer-theme";
+        var KEY = "veil-theme";
+        var LEGACY = "overseer-theme";
         var v = null;
         try {
           v = localStorage.getItem(KEY);
+          if (!v) {
+            v = localStorage.getItem(LEGACY);
+            if (v) {
+              try {
+                localStorage.setItem(KEY, v);
+              } catch (e2) {}
+            }
+          }
         } catch (e) {}
-        var t = v === "light-orange" ? "light-orange" : "dark";
+        var themes = { "light-orange": 1, rose: 1, ember: 1 };
+        var t = v && themes[v] ? v : "dark";
         document.documentElement.setAttribute("data-theme", t);
       })();
     </script>
-    <link rel="icon" href="/static/logo.png" type="image/png" sizes="any" />
+    <link rel="icon" href="/static/logo-rose-icon.svg" type="image/png" sizes="any" />
     <link rel="stylesheet" href="/static/styles.css" />
   </head>
   <body>
     <header class="app-header">
       <div class="header-inner">
-        <a class="brand" href="/" aria-label="Overseer — home">
-          <img src="/static/logo.svg" width="220" height="40" alt="" decoding="async" />
+        <a class="brand" href="/" aria-label="Veil — home">
+          <img src="/static/logo-rose-icon.svg" width="220" height="40" alt="" decoding="async" />
         </a>
         <div class="toolbar">
           <div class="search-wrap">
@@ -42,6 +52,8 @@
             <select id="theme-select" class="theme-select" title="Theme" aria-label="Theme">
               <option value="dark">Dark</option>
               <option value="light-orange">Light orange</option>
+              <option value="rose">Rose</option>
+              <option value="ember">Ember</option>
             </select>
           </label>
         </div>
@@ -116,6 +128,22 @@
         </div>
       </form>
     </dialog>
+
+    <div id="extras-backdrop" class="extras-backdrop" hidden aria-hidden="true"></div>
+    <aside id="extras-drawer" class="extras-drawer" aria-hidden="true" aria-labelledby="extras-drawer-title">
+      <div class="extras-drawer-header">
+        <h2 id="extras-drawer-title">Extra URLs</h2>
+        <button type="button" class="btn" id="extras-close" aria-label="Close">Close</button>
+      </div>
+      <div id="extras-list" class="extras-list" role="list"></div>
+      <form id="extras-form" class="extras-form">
+        <label>
+          <span>URL or host:port</span>
+          <input type="text" id="extras-url" maxlength="2048" placeholder="https://…" required />
+        </label>
+        <button type="submit" class="btn btn-primary">Add</button>
+      </form>
+    </aside>
 
     <dialog id="category-order-modal" class="modal">
       <div class="modal-body">

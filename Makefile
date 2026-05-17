@@ -1,9 +1,9 @@
 .PHONY: help tidy build run clean fmt vet test docker-build docker-up docker-down docker-logs
 
-BIN      ?= dashboard
+BIN      ?= veil
 ADDR     ?= :8080
 DATA     ?= ./data
-IMAGE    ?= overseer-dashboard
+IMAGE    ?= veil-dashboard
 GO       ?= go
 
 help:
